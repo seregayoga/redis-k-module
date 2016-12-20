@@ -33,6 +33,36 @@ int DelCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
   return REDISMODULE_OK;
 }
 
+/**
+ * Command k.set sets keys by pattern
+ * usage:
+ *   k.set some:key* new-value 101
+ */
+int SetCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+  if (argc != 3) {
+    return RedisModule_WrongArity(ctx);
+  }
+  RedisModule_AutoMemory(ctx);
+
+  RedisModuleCallReply *keys_rep =
+      RedisModule_Call(ctx, "KEYS", "s", argv[1]);
+  RMUTIL_ASSERT_NOERROR(keys_rep);
+
+  size_t len = RedisModule_CallReplyLength(keys_rep);
+
+  for (size_t idx = 0; idx < len; idx++) {
+    RedisModuleCallReply *key_rep = RedisModule_CallReplyArrayElement(keys_rep, idx);
+    
+    RedisModuleString *key = RedisModule_CreateStringFromCallReply(key_rep);
+    RedisModuleCallReply *set_rep =
+      RedisModule_Call(ctx, "set", "ss", key, argv[2]);
+    RMUTIL_ASSERT_NOERROR(set_rep);
+  }
+
+  RedisModule_ReplyWithLongLong(ctx, len);
+  return REDISMODULE_OK;
+}
+
 int testDel(RedisModuleCtx *ctx) {
   RedisModuleCallReply *r =
       RedisModule_Call(ctx, "k.del", "c", "key:for:delete:*");
@@ -66,6 +96,7 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx) {
   }
 
   RMUtil_RegisterWriteCmd(ctx, "k.del", DelCommand, "fast");
+  RMUtil_RegisterWriteCmd(ctx, "k.set", SetCommand, "fast");
 
   RMUtil_RegisterWriteCmd(ctx, "k.test", TestModule);
 
